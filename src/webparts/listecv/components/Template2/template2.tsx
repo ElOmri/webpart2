@@ -585,12 +585,12 @@ if(props.templatemodele==""){
 		<header role="banner">
 			<div class="container_16">
 					<hgroup>
-						<h1>user_displayName</h1>
+						<h1>Proged Employé</h1>
 						<h2>user_jobTitle - user_department</h2>
 					</hgroup>
 	
 					<figure>
-						<img src="urlphoto" alt="profilephoto">
+						<img src="https://cdn2.iconfinder.com/data/icons/user-interface-blue/64/User_Interface_Filled_Outline-01-512.png" alt="profilephoto">
 					</figure>
 			</div>
 		</header>

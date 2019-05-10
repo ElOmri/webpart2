@@ -1,7 +1,6 @@
 import * as React from 'react';
 import styles from './Listecv.module.scss';
 import { IListecvProps } from './IListecvProps';
-import Calendar from 'react-calendar';
 //var DateTimeField = require('react-bootstrap-datetimepicker').DateTimeField;
 import * as $ from "jquery"
 import Slider from "react-slick";
@@ -10,30 +9,37 @@ import {Template2} from "..//components/Template2/template2"
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { Panel, PanelType } from 'office-ui-fabric-react/lib/Panel';
-import { AadTokenProvider } from '@microsoft/sp-http';      
-import { tasks } from '@microsoft/teams-js';
+import { DateUtils } from 'react-day-picker'
 import { ComboBox, Fabric, IComboBoxOption, mergeStyles, SelectableOptionMenuItemType, Toggle } from 'office-ui-fabric-react/lib/index';
 import { TextField, MaskedTextField } from 'office-ui-fabric-react/lib/TextField';
 import { MessageBarButton } from 'office-ui-fabric-react/lib/Button';
 import { Label } from 'office-ui-fabric-react/lib/Label';
 import { Link } from 'office-ui-fabric-react/lib/Link';
-/*import { sp } from "@pnp/sp";
-import { SPFetchClient } from "@pnp/nodejs";*/
-import { TeachingBubble } from 'office-ui-fabric-react/lib/TeachingBubble';
+import IntlTelInput from 'react-intl-tel-input';
+import 'react-intl-tel-input/dist/main.css';
 import ToggleButtonGroup from '@material-ui/lab/ToggleButtonGroup';
 import ToggleButton from '@material-ui/lab/ToggleButton';
-import { Element } from '@progress/kendo-drawing/dist/npm/shapes';
 import StarRateIcon from '@material-ui/icons/StarRate';
 import SupervisorAccountIcon from '@material-ui/icons/SupervisorAccount';
 import { DefaultButton, PrimaryButton, IButtonProps } from 'office-ui-fabric-react/lib/Button';
 import { MessageBar, MessageBarType } from 'office-ui-fabric-react/lib/MessageBar';
 import { createStyles, Theme, withStyles, WithStyles } from '@material-ui/core/styles';
-import Grid from '@material-ui/core/Grid';
-import DayPickerInput from 'react-day-picker/DayPickerInput';
+import DayPicker from 'react-day-picker';
+import { hiddenContentStyle} from 'office-ui-fabric-react/lib/Styling';
+import { Dialog, DialogType, DialogFooter } from 'office-ui-fabric-react/lib/Dialog';
 import 'react-day-picker/lib/style.css';
-
+import {  ITextFieldProps } from 'office-ui-fabric-react/lib/TextField';
+import { IconButton } from 'office-ui-fabric-react/lib/Button';
+import { Callout } from 'office-ui-fabric-react/lib/Callout';
+import SimpleCrypto from "simple-crypto-js";
+import { getId } from 'office-ui-fabric-react/lib/Utilities';
+import { getTheme, FontWeights } from 'office-ui-fabric-react/lib/Styling';
+import ReactPhoneInput from 'react-phone-input-2'
+import 'react-phone-input-2/dist/style.css'
 export interface IState{
+  titleRequest: any;
   showPanel: boolean;
+  showPanel2:boolean;
   responses:any[]
   modeleTemplate:string
   token:string
@@ -49,6 +55,22 @@ export interface IState{
       isEmpty: boolean;
       isDisabled: boolean;
   userevent: any;
+  selectedDays: Date[],
+  identifiant:string,
+  company:string,
+  adresse:string,
+  telephone:string,
+  password:string,
+  password2:string,
+  nom:string,
+  prenom:string,
+  isCalloutVisible: boolean;
+  hideDialog: boolean;
+  hideDialog2: boolean;
+login : string;
+pw:string;
+signRequest:any;
+loggedinUser:string;
 }
 
 
@@ -82,10 +104,12 @@ const stylesx = (theme: Theme) =>
   export interface Propsx extends WithStyles<typeof stylesx> {}
   
 export default class Listecv extends React.Component<IListecvProps, IState> {
+ 
 
   
   constructor(props :IListecvProps,state :  IState )
   { super(props);
+    
     if (typeof(Storage) !== "undefined") {
       let storedNames= [];
       let storedIds=[];
@@ -104,6 +128,23 @@ export default class Listecv extends React.Component<IListecvProps, IState> {
       }   
     }
     this.state = { 
+      loggedinUser:"",
+      signRequest:null,
+      login:"",
+      pw:"",
+      hideDialog: false,
+      hideDialog2:true,
+      titleRequest: ['default'],
+      isCalloutVisible: false,
+      adresse:"",
+      company:"",
+      nom:"",
+      prenom:"",
+      identifiant:"",
+      password:"",
+      password2:"",
+      telephone:"",
+      showPanel2:false,
       userevent:null,
        showPanel: false,
       isTeachingBubbleVisible: false,
@@ -120,12 +161,14 @@ export default class Listecv extends React.Component<IListecvProps, IState> {
     selectedDay: null,
       isEmpty: true,
       isDisabled: false,
+      selectedDays: [],
     };
      
   }
   public Image;
   public _image: HTMLElement;
-
+  private _descriptionId: string = getId('description');
+  private _iconButtonId: string = getId('iconButton');
   private _onDismiss() {
     this.setState({
       isTeachingBubbleVisible: false
@@ -140,9 +183,97 @@ export default class Listecv extends React.Component<IListecvProps, IState> {
    
   }
 
-  private requestToken(_ComponenetContext):void {  
-//https://cors-anywhere.herokuapp.com/
+  private addUser(_componentContext,token,identifiant,companyName,password,adresse,telephone,nom,prenom)
+  {
+    var _secretKey = "elomri";
+ 
+var simpleCrypto = new SimpleCrypto(_secretKey);
+var cryptedpassword = simpleCrypto.encrypt(password);
+    var x ={"fields": {
+      "Title": identifiant,
+      "company" : companyName,
+      "password": cryptedpassword,
+      "adresse" : adresse,
+      "telephone": telephone,
+      "nom" : nom,
+      "email": prenom
+   }}
+    $.ajax({  
+      "async": true,  
+      "crossDomain": true,  
+      "url": "https://graph.microsoft.com/beta/sites/root/lists/cec630c7-c1f1-4025-a8b2-d77167035e5d/items/", 
+      "method": "POST",  
+      "headers": {  
+          "content-type": "application/json"  ,
+         
+      },  
+      "data": JSON.stringify(x),  
+      beforeSend: function(xhr, settings) { xhr.setRequestHeader('Authorization','Bearer ' + token); } ,
+      success: function(response) {  
+      }  
 
+  })  
+  }
+
+  private _onRenderLabel = (props: ITextFieldProps): JSX.Element => {
+    return (
+      <>
+        
+          <span>{props.label}</span>
+          <IconButton
+            id={this._iconButtonId}
+            iconProps={{ iconName: 'Info' }}
+            title="Info"
+            ariaLabel="Info"
+            onClick={this._onIconClick}
+            styles={{ root: { marginBottom: -3 } }}
+          />
+      
+        {this.state.isCalloutVisible && (
+          <Callout
+            target={'#' + this._iconButtonId}
+            setInitialFocus={true}
+            onDismiss={this._onDismiss2}
+            ariaDescribedBy={this._descriptionId}
+            role="alertdialog"
+          >
+            
+              <span id={this._descriptionId}>Jamais partager l'identifiant</span>
+              <DefaultButton onClick={this._onDismiss2}>Close</DefaultButton>
+        
+          </Callout>
+        )}
+      </>
+    );
+  };
+
+  private _onIconClick = (): void => {
+    this.setState({ isCalloutVisible: !this.state.isCalloutVisible });
+  };
+
+  private _onDismiss2 = (): void => {
+    this.setState({ isCalloutVisible: false });
+  };
+
+
+  handleDayClick(day, { selected }) {
+    const { selectedDays } = this.state;
+
+    if (selected) {
+     
+
+      const selectedIndex = selectedDays.findIndex(selectedDay =>
+       (selectedDay.getTime() == day.getTime())
+    
+      );
+      selectedDays.splice(selectedIndex, 1);
+    } else {
+      selectedDays.push(day);
+    }
+    this.setState({ selectedDays });
+  }
+
+  private requestToken(_ComponenetContext):void {  
     $.ajax({  
       "async": true,  
       "crossDomain": true,  
@@ -168,13 +299,59 @@ export default class Listecv extends React.Component<IListecvProps, IState> {
       }  
 
   })  
+
 }  
 
-/*private addFavourite():void
+private _getErrorMessage2 = (value: string): string => {
+let x =this.state.titleRequest;
+let verif =false;
+x.value.forEach(element => {
+  if((element.fields.Title)==value)
+verif=true
+
+});
+
+  if(verif)
+  {
+    this.setState(
+      {
+        identifiant : ""
+      }
+    )
+    return  'identifiant utilisé'
+  }
+  else
+  {
+    return ''
+  }
+  
+};
+
+private Deconnect()
 {
-  this.
-}*/
-      
+this.setState(
+  {
+    loggedinUser:"",
+    adresse:"",
+    company:"",
+    telephone:"",
+    nom:"",
+    prenom:""
+  }
+)
+}
+
+private _getErrorMessage = (value: string): string => {
+  if(value!=this.state.password)
+  {
+    this.setState(
+      {
+        password2 : ""
+      }
+    )
+  }
+  return value == this.state.password  ? '' : `les deux mot de passe ne sont pas identiques.`;
+};
     private getCurrentUser(componentContext,token) :boolean{
   if(componentContext.state.alignment=="left")
   {
@@ -271,7 +448,28 @@ export default class Listecv extends React.Component<IListecvProps, IState> {
 
       }
 
-
+  private getidentifiant(token,componentContext)
+      {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', "https://graph.microsoft.com/beta/sites/root/lists/cec630c7-c1f1-4025-a8b2-d77167035e5d/items?expand=fields(select=Title)", true);
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        let  Response=null;
+        xhr.onreadystatechange = function (a:any) {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            Response=(JSON.parse(xhr.responseText));
+            
+            componentContext.setState(
+                {
+                  titleRequest : Response
+                }
+              )
+            
+            
+         
+        };
+      }
+        xhr.send();
+      }
       private getevents(element,token,componentContext)
       {
         var xhr = new XMLHttpRequest();
@@ -350,7 +548,8 @@ responsibilities={element.responsibilities}
             onClick={()=>this._showPanel(element.userPrincipalName,this.state.token,this)}
           
           />
-    <div><img onMouseEnter={this._onShow.bind(this)} onMouseOut={this._onDismiss.bind(this)}   src={!JSON.parse(localStorage.getItem("listeid")).includes(element.userPrincipalName)?'https://image.flaticon.com/icons/svg/149/149220.svg':'https://image.flaticon.com/icons/svg/148/148839.svg'} onClick={()=>{this.setFavourite(element.userPrincipalName)}} width={50} height={50} style={{ float : "right"}} />
+         
+    <div><img    src={!JSON.parse(localStorage.getItem("listeid")).includes(element.userPrincipalName)?'https://image.flaticon.com/icons/svg/149/149220.svg':'https://image.flaticon.com/icons/svg/148/148839.svg'} onClick={()=>{this.setFavourite(element.userPrincipalName)}} width={50} height={50} style={{ float : "right"}} />
    
     </div>
     </div>
@@ -433,11 +632,16 @@ if(favouri.includes(element.userPrincipalName))
 private setFavourite(namex):void
 {
  
+
+
   let x =JSON.parse(localStorage.getItem("listeid"));
   if(!x.includes(namex))
   {
     x.push(namex)
     localStorage.setItem("listeid", JSON.stringify(x));
+
+   
+
   } 
   else
   {
@@ -446,7 +650,11 @@ private setFavourite(namex):void
       localStorage.setItem("listeid", JSON.stringify(x));
  
   }
- 
+  this._showDialog2()
+    setTimeout( function(){ 
+      
+      this.setState({ hideDialog2: true });
+    }  , 1000 );
 }
 
 private handleDayChange(selectedDay, modifiers, dayPickerInput) {
@@ -457,13 +665,73 @@ private handleDayChange(selectedDay, modifiers, dayPickerInput) {
     isDisabled: modifiers.disabled === true,
   });
 }
- private getDate(): Date
- {
-   let now = new Date();
-   now.setDate(now.getDate()+50)
-   return now
- }
+ 
+private requestSignin(componentContext,token)
+{
+  if(componentContext.state.signRequest==null)
+  {
+  var  xhr = new XMLHttpRequest();
+  xhr.open('GET', "https://graph.microsoft.com/beta/sites/root/lists/cec630c7-c1f1-4025-a8b2-d77167035e5d/items?expand=fields", true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  let  Response=null;
+  xhr.onreadystatechange = function (a:any) {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      Response=(JSON.parse(xhr.responseText));
+      
+      componentContext.setState(
+          {
+            signRequest: Response
+          }
+        )
+      
+      
+   
+  };
+}
+  xhr.send();
+}
 
+}
+
+
+ private signin(componentContext,token)
+ {
+   let login= this.state.login;
+   let password = this.state.pw;
+   let verif=true;
+   this.state.signRequest.value.forEach(element => {
+     
+        if(element.fields.Title==login)
+        {
+          let password2=element.fields.password;
+          var _secretKey = "elomri";
+var simpleCrypto = new SimpleCrypto(_secretKey);
+var decryptedPassword = simpleCrypto.decrypt(password2);
+
+if(password==decryptedPassword)
+{
+  componentContext.setState(
+    {
+      loggedinUser: login,
+      adresse:element.fields.adresse,
+      company:element.fields.company,
+      email:element.fields.email,
+      telephone:element.fields.telephone,
+      hideDialog:true
+    }
+  )
+  verif=false;
+}
+
+
+        }
+
+   });
+if(verif)
+{
+  alert("verifier le mot de passe ou login")
+}
+ }
   
     private getTemplateModele(componentContext,token)
     {
@@ -508,15 +776,33 @@ private handleDayChange(selectedDay, modifiers, dayPickerInput) {
     this.setState({ showPanel: true });
   };
 
-  private getCalender():any
+  private _showPanel2 (componentContext,token) {
+    if(this.state.loggedinUser=="")
+    {
+   this.getidentifiant(token,componentContext)
+   this.setState({ showPanel2: true });
+    }
+    else
+    {
+      alert("veuillez deconnecter")
+    }
+ };
+
+  private getCalender():Date[]
   {
     let x=[];
     if(this.state.userevent!=null){
+
     this.state.userevent.value.forEach(element => {
 
-     x.push(element.start.dateTime);
+     x.push(new Date(element.start.dateTime));
     });
-alert(x)
+    
+    for (let index = 1; index < (new Date().getDate()) ; index++) {
+     
+      x.push(new Date(new Date().getFullYear(),new Date().getMonth(),index));
+    }
+
     return x;
   }else
   {
@@ -524,14 +810,35 @@ alert(x)
     x.push(new Date());
 return x;
   }
-    
   }
 
+
+
+  private _showDialog = (): void => {
+    this.setState({ hideDialog: false });
+  };
+
+  private _closeDialog = (): void => {
+    this.setState({ hideDialog: true });
+  };
+  private _showDialog2 = (): void => {
+    this.setState({ hideDialog2: false });
+  };
+
+  private _closeDialog2 = (): void => {
+    this.setState({ hideDialog2: true });
+  };
+
+
+  private _hidePanel2 = (): void => {
+    this.setState({ showPanel2: false });
+  };
   private _hidePanel = (): void => {
     this.setState({ showPanel: false });
   };
   public render(): React.ReactElement<IListecvProps> {
   {}
+  const disabled= this.getCalender();
   
   const exampleImageProps: IImageProps = { height: 'auto' , width: 'auto' , src: 'https://media.giphy.com/media/2vkoYTKBWuGxOnDHKO/giphy.gif'   };
    const _ComponenetContext = this;
@@ -541,12 +848,12 @@ return x;
    const { selectedDay, isDisabled, isEmpty } = this.state;
    var settings = {
     dots: true,
-    adaptiveHeight : true,
+    adaptiveHeight : false,
     width : 1200,
     speed: 700,
     slidesToShow: 1,
     slidesToScroll: 1,
-    centerMode: true,
+    
     
    
     
@@ -560,7 +867,8 @@ return x;
   };
    
   {this.getlisteID(_ComponenetContext,_ComponenetContext.state.token)}
-  
+  {
+    this.requestSignin(_ComponenetContext,_ComponenetContext.state.token);}
 if(this.element()=="")
 { 
   return <div>Loading ..</div>
@@ -572,7 +880,41 @@ if(this.element()=="")
       
      
       <div>
-      
+      <Dialog
+        
+          hidden={this.state.hideDialog2}
+          onDismiss={this._closeDialog2}
+          dialogContentProps={{
+              
+            type: DialogType.largeHeader,
+            title: 'Favouri',
+            subText: 'les profils favouris sont sauvegardés au navigateur',
+         
+        
+          }}
+         
+          containerClassName={ 'ms-dialogMainOverride ' + styles.textDialog}
+ 
+        >
+       <div style={{ width : 230 }} >
+        <img  src="https://media.giphy.com/media/6zHB86JLnQHFS/giphy.gif" />
+          
+          </div>
+</Dialog>
+        <div style={{float:"right", paddingTop:50}}>
+      <PrimaryButton
+            text="Créer un compte"
+            onClick={()=>this._showPanel2(this,this.state.token)}
+          style={{ paddingRight :20, paddingLeft: 20}}
+          />
+<span>  </span>
+            <PrimaryButton
+            text="Connexion"
+            onClick={()=>this._showDialog()}
+            style={{paddingRight:20 , paddingLeft:20}}
+          />
+</div>
+          {(this.state.loggedinUser!="") ?<div style={{float:"left"}} ><span style={{ fontWeight:"bold"  }} >  Bonjour </span><span style={{ fontWeight:"bold" , color:"blue" }}> {this.state.loggedinUser}</span><br/><DefaultButton text={"Deconnexion"} onClick={()=>this.Deconnect()} /></div>:<p></p>}
         <ToggleButtonGroup  style={{ paddingRight: 290 , paddingLeft : 290 }} value={_ComponenetContext.state.alignment}  exclusive onChange={()=>this.getCurrentUser(_ComponenetContext,_ComponenetContext.state.token)} >
       <ToggleButton value="left">
       <StarRateIcon  style={{ float: "left" , width: "auto"}} fontSize={ "large"} />
@@ -588,24 +930,8 @@ if(this.element()=="")
       </Slider>
       <br/>
       <br/>
-      <div>
-      {isTeachingBubbleVisible? (
-          <div>
-            <TeachingBubble
-              targetElement={this._image}
-              hasCondensedHeadline={true}
-              hasCloseIcon={false}
-              headline="Make this one of my favourite "
-              illustrationImage={exampleImageProps}
-              onDismiss={this._onDismiss.bind(this)}
-              ignoreExternalFocusing={true}
-            >
-                Favourite persons are stored in browser cache
-            </TeachingBubble>
-          </div>
-        ) : null}
-</div>
-     <div ref={Image => (this._image = Image!)} ></div>
+     
+     
      <Panel
           isOpen={this.state.showPanel}
           onDismiss={this._hidePanel}
@@ -613,11 +939,7 @@ if(this.element()=="")
           headerText="Contact"
           closeButtonAriaLabel="Close"
         >
-        <TextField label="Nom" type="text" iconProps={{ iconName: 'contact' }}  required /> 
-        <TextField label="Prénom" type="text" iconProps={{ iconName: 'contactinfo' }}  required /> 
-        <TextField label="Company Name" type="text" iconProps={{ iconName: 'backlogboard' }}  required />
-        <TextField label="Email" type="Email" iconProps={{ iconName: 'mail' }}  required />
-        <MaskedTextField required label="Numéro Telephone" mask="\(+216)  99 - 999 - 999" iconProps={{ iconName: 'phone' }}  />
+        
         <Fabric className={wrapperClassName}>
         <ComboBox
           required
@@ -647,42 +969,22 @@ if(this.element()=="")
         </span>
       </Fabric>
         <TextField required label="Besoin" multiline rows={3} iconProps={{ iconName: 'glasses' }} />
+      
+      
        
-        <p>
-          {isEmpty && 'Please type or pick a day'}
-          {!isEmpty && !selectedDay && 'This day is invalid'}
-          {selectedDay && isDisabled && 'This day is disabled'}
-          {selectedDay &&
-            !isDisabled &&
-            `Jour de meeting favori : ${selectedDay.toLocaleDateString()}`}
-        </p>
-        <DayPickerInput
-        format={'D/M/YYYY'}
-          value={selectedDay}
-          onDayChange={this.handleDayChange.bind(this)}
-          dayPickerProps={{
-            selectedDays: selectedDay,
-            
-            disabledDays:
-            [
-              
-         new Date(this.getCalender()[0])
-              ,
-              new Date("2019-04-28T01:20:44.1030000")
-             ,
-             
-             
-          
+
+        <DayPicker
+      
+      selectedDays={this.state.selectedDays}
+          onDayClick={this.handleDayClick.bind(this)}
+      fromMonth={new Date()}
+      disabledDays={
+        disabled   
+  }
+    />
     
-               {
-              daysOfWeek: [0, 6],
-              
-               before: new Date(),
-               after : this.getDate()      
-          }]
-        }}
-        />
-<Label>Warning :</Label>
+
+<Label>NB :</Label>
       <MessageBar
         onDismiss={this._hidePanel}
         dismissButtonAriaLabel="Close"
@@ -697,9 +999,62 @@ if(this.element()=="")
       >
       J'ai lu et j'accepte le règlement du societé .
       <br/>
-        <Link href="www.google.fr">le règlement du societé </Link>
+        <Link href="#">le règlement du societé </Link>
       </MessageBar>
         </Panel>
+<Panel
+ isOpen={this.state.showPanel2}
+ onDismiss={this._hidePanel2}
+ type={PanelType.extraLarge}
+ headerText="Sign UP"
+ closeButtonAriaLabel="Close"
+
+>
+<form onSubmit={  ()=>this.addUser(this,this.state.token,this.state.identifiant,this.state.company
+              ,this.state.password,this.state.adresse,this.state.telephone,this.state.nom,this.state.prenom)} >
+<TextField label="Email" type="email" iconProps={{ iconName: 'mail' }} value={this.state.identifiant} onBlur={(value)=>this.setState({identifiant: value.target.value})} validateOnLoad={false} onGetErrorMessage={this._getErrorMessage2} validateOnFocusIn validateOnFocusOut onRenderLabel={this._onRenderLabel.bind(this)} required />
+<TextField label="Nom" type="text" iconProps={{ iconName: 'contact' }} value={this.state.nom} onBlur={(value)=>this.setState({nom: value.target.value})} required />
+<TextField label="Prenom" type="text" iconProps={{ iconName: 'contact' }} value={this.state.prenom} onBlur={(value)=>this.setState({prenom: value.target.value})} required />
+<TextField label="adresse" type="text" iconProps={{ iconName: 'contact' }} value={this.state.adresse} onBlur={(value)=>this.setState({adresse: value.target.value})}  required />
+<TextField label="Nom du societé" type="text" iconProps={{ iconName: 'backlogboard' }} value={this.state.company} onBlur={(value)=>this.setState({company: value.target.value})} required />
+<TextField label="Mot de passe" type="password" iconProps={{ iconName: 'backlogboard' }} value={this.state.password} onBlur={(value)=>this.setState({password: value.target.value})} required />
+<TextField label="Confirmation mot de passe" type="text" iconProps={{ iconName: 'backlogboard' }} value={this.state.password2} onBlur={(value)=>this.setState({password2: value.target.value})} validateOnLoad={false} onGetErrorMessage={this._getErrorMessage} validateOnFocusIn
+              validateOnFocusOut required />
+
+<label style={{ fontStyle : 'bold'  }}>Numéro de telephone :</label>
+<ReactPhoneInput  required defaultCountry={'tn'}  value={this.state.telephone} onBlur={(value)=>this.setState({telephone: value.target.value})} />
+<PrimaryButton
+type="submit"
+            text="Sign UP"
+            style={{float : 'right' }}
+          />
+          
+</form >
+</Panel>
+
+<Dialog
+
+          hidden={this.state.hideDialog}
+          onDismiss={this._closeDialog}
+          dialogContentProps={{
+            type: DialogType.largeHeader,
+            title: 'Connexion',
+            subText: 'Veuillez saisir votre identifiant et mot de passe pour se connecter'
+          }}
+          modalProps={{
+            isBlocking: false,
+            styles: { main: { maxWidth: 450 } }
+          }}
+        >
+         <TextField label="Identifiant" type="text" iconProps={{ iconName: 'contactinfo' }} value={this.state.login} onBlur={(value)=>this.setState({login: value.target.value})}  onRenderLabel={this._onRenderLabel.bind(this)} required />
+         <TextField label="Mot de passe" type="password" iconProps={{ iconName: 'backlogboard' }} value={this.state.pw} onBlur={(value)=>this.setState({pw: value.target.value})} required />
+          <DialogFooter>
+            <PrimaryButton onClick={()=>this.signin(this,this.state.token)} text="Sign in" />
+            <DefaultButton onClick={this._closeDialog} text="Cancel" />
+          </DialogFooter>
+        </Dialog>
+
+        
 </div>
     );
 
